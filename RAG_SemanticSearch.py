@@ -25,6 +25,8 @@ from langchain.prompts import PromptTemplate
 # Append the utils module path and import utilities
 module_path = ".."
 sys.path.append(os.path.abspath(module_path))
+# # Add the parent directory to the system path
+# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils import bedrock, print_ww
 from utils.TokenCounterHandler import TokenCounterHandler
 
@@ -104,25 +106,46 @@ for idx, file in enumerate(filenames):
         document_fragment.metadata = metadata[idx]
     documents += document
 # %%
-documents
-# %%
-# Split the documents into chunks
-text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-docs = text_splitter.split_documents(documents)
 
-# Calculate and print interesting statistics
-avg_doc_length = lambda docs: sum(len(doc.page_content) for doc in docs) // len(docs)
-print(f'Average length among {len(documents)} documents loaded is {avg_doc_length(documents)} characters.')
-print(f'After the split we have {len(docs)} documents as opposed to the original {len(documents)}.')
-print(f'Average length among {len(docs)} documents (after split) is {avg_doc_length(docs)} characters.')
+def printout(documents):
+    # Calculate and print interesting statistics
+    avg_doc_length = lambda docs: sum(len(doc.page_content) for doc in docs) // len(docs)
+    print(f'Average length among {len(documents)} documents loaded is {avg_doc_length(documents)} characters.')
+    print(f'After the split we have {len(docs)} documents as opposed to the original {len(documents)}.')
+    print(f'Average length among {len(docs)} documents (after split) is {avg_doc_length(docs)} characters.')
 
-# Generate sample embedding for a document chunk
-sample_embedding = np.array(bedrock_embeddings.embed_query(docs[0].page_content))
-print("Sample embedding of a document chunk: ", sample_embedding)
-print("Size of the embedding: ", sample_embedding.shape)
+def generateSampleEmbeding(docs):
+    # Generate sample embedding for a document chunk
+    sample_embedding = np.array(bedrock_embeddings.embed_query(docs[0].page_content))
+    print("Sample embedding of a document chunk: ", sample_embedding)
+    print("Size of the embedding: ", sample_embedding.shape)
 # %%
-# Create vector store and index wrapper
-vectorstore_faiss = FAISS.from_documents(docs, bedrock_embeddings)
+# Define the file path for the FAISS index
+faiss_index_file = "./data/faiss_index.idx"
+
+# Function to save FAISS index
+def save_faiss_index(faiss_index, file_path):
+    faiss_index.faiss_index.save(file_path)
+
+# Function to load FAISS index
+def load_faiss_index(file_path):
+    return FAISS.load(file_path)
+# %%
+# Check if the index file already exists
+if os.path.exists(faiss_index_file):
+    # Load the existing FAISS index
+    vectorstore_faiss = FAISS.load_local(faiss_index_file, bedrock_embeddings)
+else:
+    # Split the documents into chunks
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+    docs = text_splitter.split_documents(documents)
+    # Create vector store and index wrapper
+    vectorstore_faiss = FAISS.from_documents(docs, bedrock_embeddings)
+    # Save the FAISS index to a file
+    vectorstore_faiss.save_local(faiss_index_file)
+
+# %%
+printout(documents)
 wrapper_store_faiss = VectorStoreIndexWrapper(vectorstore=vectorstore_faiss)
 # %%
 # Perform a query and print the result
@@ -131,6 +154,7 @@ answer = wrapper_store_faiss.query(question=query, llm=llm)
 print_ww(answer)
 
 # %%
+# Performe prompt engineering
 # Perform a more customizable query using RetrievalQA
 prompt_template_str = """
 Human: Use the following pieces of context to provide a concise answer to the question at the end. If you don't know the answer, just say that you don't know, don't try to make up an answer.
@@ -166,10 +190,10 @@ qa = RetrievalQA.from_chain_type(
 # questions
 # 1. "recommend good data scientist candidates?"
 # 2. "How was Amazon impacted by COVID-19?"
-# 3. "recommend good data machine learning engineer?"
+# 3. "recommend good data machine learning engineers?"
 
 # %%
-query = "How was Amazon impacted by COVID-19?"
+query = "recommend multiple candidates of good data scientist candidates?"
 result = qa({"query": query})
 print_ww(result['result'])
 
