@@ -189,18 +189,6 @@ print(f"\n{result['source_documents']}")
 
 # %%
 def perform_query(query):
-    result = qa({"query": query})
-    answer = result['result']
-
-    # Convert each Document object to a string
-    source_documents_str = [str(doc) for doc in result['source_documents']]
-    
-    # Join the string representations of the documents
-    source_documents_joined = "\n".join(source_documents_str)
-
-    return answer, source_documents_joined
-# %%
-def perform_query(query):
     # Perform the query using wrapper_store_faiss
     answer = wrapper_store_faiss.query(question=query, llm=llm)
     return answer
