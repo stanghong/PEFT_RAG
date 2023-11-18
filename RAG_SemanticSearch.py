@@ -21,6 +21,7 @@ from langchain.indexes import VectorstoreIndexCreator
 from langchain.indexes.vectorstore import VectorStoreIndexWrapper
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
+import gradio as gr
 
 # Append the utils module path and import utilities
 module_path = ".."
@@ -106,20 +107,6 @@ for idx, file in enumerate(filenames):
         document_fragment.metadata = metadata[idx]
     documents += document
 # %%
-
-def printout(documents):
-    # Calculate and print interesting statistics
-    avg_doc_length = lambda docs: sum(len(doc.page_content) for doc in docs) // len(docs)
-    print(f'Average length among {len(documents)} documents loaded is {avg_doc_length(documents)} characters.')
-    print(f'After the split we have {len(docs)} documents as opposed to the original {len(documents)}.')
-    print(f'Average length among {len(docs)} documents (after split) is {avg_doc_length(docs)} characters.')
-
-def generateSampleEmbeding(docs):
-    # Generate sample embedding for a document chunk
-    sample_embedding = np.array(bedrock_embeddings.embed_query(docs[0].page_content))
-    print("Sample embedding of a document chunk: ", sample_embedding)
-    print("Size of the embedding: ", sample_embedding.shape)
-# %%
 # Define the file path for the FAISS index
 faiss_index_file = "./data/faiss_index.idx"
 
@@ -137,7 +124,7 @@ if os.path.exists(faiss_index_file):
     vectorstore_faiss = FAISS.load_local(faiss_index_file, bedrock_embeddings)
 else:
     # Split the documents into chunks
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=100)
     docs = text_splitter.split_documents(documents)
     # Create vector store and index wrapper
     vectorstore_faiss = FAISS.from_documents(docs, bedrock_embeddings)
@@ -145,13 +132,14 @@ else:
     vectorstore_faiss.save_local(faiss_index_file)
 
 # %%
-printout(documents)
 wrapper_store_faiss = VectorStoreIndexWrapper(vectorstore=vectorstore_faiss)
 # %%
 # Perform a query and print the result
 query = "find top candidates for data scientist position?"
 answer = wrapper_store_faiss.query(question=query, llm=llm)
 print_ww(answer)
+
+
 
 # %%
 # Performe prompt engineering
@@ -193,9 +181,38 @@ qa = RetrievalQA.from_chain_type(
 # 3. "recommend good data machine learning engineers?"
 
 # %%
-query = "recommend multiple candidates of good data scientist candidates?"
+query = "recommend good data machine learning engineers?"
 result = qa({"query": query})
 print_ww(result['result'])
 
 print(f"\n{result['source_documents']}")
+
 # %%
+def perform_query(query):
+    result = qa({"query": query})
+    answer = result['result']
+
+    # Convert each Document object to a string
+    source_documents_str = [str(doc) for doc in result['source_documents']]
+    
+    # Join the string representations of the documents
+    source_documents_joined = "\n".join(source_documents_str)
+
+    return answer, source_documents_joined
+# %%
+def perform_query(query):
+    # Perform the query using wrapper_store_faiss
+    answer = wrapper_store_faiss.query(question=query, llm=llm)
+    return answer
+
+# %%
+question = gr.Textbox(label="Question")
+output = gr.Textbox()
+gr.Interface(
+    fn=perform_query,
+    inputs=[question],
+    outputs=output,
+    title="Candidate Sourcing",
+    description="Find ideal candidates by prompts or job description",
+    examples=[["Find ideal data scientists?"]]
+).launch(share=True)
