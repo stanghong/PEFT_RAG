@@ -210,14 +210,10 @@ def get_host(collection_name):
     return host
 
 # %%
-# from langchain.schema.document import Document
-# docs = [Document(page_content='xxx', metadata={'id': 0, 'source': 'xx'})]
-
-# %%
 #####################################################################
 #######################   create  collection  #######################
 #####################################################################
-create_policies(collection_name)
+# create_policies(collection_name)
 # %%
 
 
@@ -279,20 +275,52 @@ if collection_exists(collection_name):
 # Perform question and answer retrieval
 query = "find top 5 VP from a tech company with 5 + years of experience?"
 
-results = docsearch.similarity_search(query, k=3)  # our search query  # return 3 most relevant docs
+results = docsearch.similarity_search(query, k=5)  # our search query  # return 3 most relevant docs
 print(dumps(results, pretty=True))
 
-
+# %%
 ##################################################################################################
 # Prompt-based question answering with source information
 # ...
+query = "Is it possible that I get sentenced to jail due to failure in filings?"
 
-# Clean up
+results = docsearch.similarity_search(query, k=5)  # our search query  # return 3 most relevant docs
+print(dumps(results, pretty=True))
+# %%
+# questions
+# 1. "recommend good data scientist candidates?"
+# 2. "How was Amazon impacted by COVID-19?"
+# 3. "recommend good data machine learning engineers?"
 
 # %%
-# Conclusion and takeaways
-# ...
-# aoss_client.delete_collection(id=collection_name['createCollectionDetail']['id'])
+from langchain.chains import RetrievalQA
+from langchain.prompts import PromptTemplate
+
+"Is it possible that I get sentenced to jail due to failure in filings?"
+"Find best candidate for VP of data science"
+# %%
+prompt_template = """Human: Use the following pieces of context to provide a concise answer in English to the question at the end. If you don't know the answer, just say that you don't know, don't try to make up an answer.
+
+{context}
+
+Question: {question}
+Assistant:"""
+
+PROMPT = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
+
+qa_prompt = RetrievalQA.from_chain_type(
+    llm=llm,
+    chain_type="stuff",
+    retriever=docsearch.as_retriever(),
+    return_source_documents=True,
+    chain_type_kwargs={"prompt": PROMPT},
+)
+query = "Find best candidate for CEO for Fortrune 500 company"
+result = qa_prompt({"query": query})
+print_ww(result["result"])
+
+print(f"\n{result['source_documents']}")
+# Clean up
 # %%
 
 # aoss_client.delete_collection(id=collection_name['createCollectionDetail']['id'])
