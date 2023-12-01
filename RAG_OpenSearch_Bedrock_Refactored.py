@@ -43,43 +43,19 @@ llm = Bedrock(
 bedrock_embeddings = BedrockEmbeddings(client=boto3_bedrock)
 # %%
 # List of PDF filenames and their metadata
-filenames = [
-"Data_Scientist_Resume_0.pdf",
-"Data_Scientist_Resume_1.pdf",
-"Data_Scientist_Resume_3.pdf",
-"Data_Scientist_Resume_2.pdf",
-"Data_Scientist_Resume_6.pdf",
-"Data_Scientist_Resume_7.pdf",
-"Data_Scientist_Resume_5.pdf",
-"Data_Scientist_Resume_4.pdf",
-"Data_Scientist_Resume_10.pdf",
-"Data_Scientist_Resume_9.pdf",
-"Data_Scientist_Resume_8.pdf",
-"Machine_Learning_Engineer_Resume_3.pdf",
-"Machine_Learning_Engineer_Resume_2.pdf",
-"Machine_Learning_Engineer_Resume_5.pdf",
-"Machine_Learning_Engineer_Resume_4.pdf",
-]
+def get_pdf_filenames(folder_path):
+    pdf_filenames = [f for f in os.listdir(folder_path) if f.endswith('.pdf')]
+    return pdf_filenames
+folder_path = 'output_pdfs'
+filenames = get_pdf_filenames(folder_path)
 
-metadata = [
-    dict(id=0, source=filenames[0]),
-    dict(id=1, source=filenames[1]),
-    dict(id=2, source=filenames[2]),
-    dict(id=3, source=filenames[3]),
-    dict(id=4, source=filenames[4]),
-    dict(id=5, source=filenames[5]),
-    dict(id=6, source=filenames[6]),
-    dict(id=7, source=filenames[7]),
-    dict(id=8, source=filenames[8]),
-    dict(id=9, source=filenames[9]),
-    dict(id=10, source=filenames[10]),
-    dict(id=11, source=filenames[11]),
-    dict(id=12, source=filenames[12]),
-    dict(id=13, source=filenames[13]),
-    dict(id=14, source=filenames[14]),
-    ]
+def create_metadata(filenames):
+    metadata = [dict(id=i, source=filename) for i, filename in enumerate(filenames)]
+    return metadata
+metadata = create_metadata(filenames)
 
-data_root = "./data/"
+data_root = "./output_pdfs/"
+
 # %%
 # Process PDF documents
 
@@ -241,7 +217,10 @@ def get_host(collection_name):
 #####################################################################
 #######################   create  collection  #######################
 #####################################################################
+create_policies(collection_name)
 # %%
+
+
 if not collection_exists(collection_name):
     # create_policies(collection_name)
     collection = aoss_client.create_collection(name=vector_store_name,type='VECTORSEARCH')
@@ -253,6 +232,10 @@ if not collection_exists(collection_name):
     service = 'aoss'
     credentials = boto3.Session().get_credentials()
     auth = AWSV4SignerAuth(credentials, os.environ.get("AWS_DEFAULT_REGION", None), service)
+    
+    # Increase the bulk_size value
+    bulk_size = 3500 
+
     # ingest docs into opensearch and create index
     docsearch = OpenSearchVectorSearch.from_documents(
     docs,
@@ -265,6 +248,7 @@ if not collection_exists(collection_name):
     connection_class = RequestsHttpConnection,
     index_name=index_name,
     engine="faiss",
+    bulk_size=bulk_size  # Updated bulk_size
     )
 # %%
 
@@ -293,7 +277,7 @@ if collection_exists(collection_name):
     
 # %%
 # Perform question and answer retrieval
-query = "find top 5 data scientists?"
+query = "find top 5 VP from a tech company with 5 + years of experience?"
 
 results = docsearch.similarity_search(query, k=3)  # our search query  # return 3 most relevant docs
 print(dumps(results, pretty=True))
@@ -308,7 +292,7 @@ print(dumps(results, pretty=True))
 # %%
 # Conclusion and takeaways
 # ...
-aoss_client.delete_collection(id=collection_name['createCollectionDetail']['id'])
+# aoss_client.delete_collection(id=collection_name['createCollectionDetail']['id'])
 # %%
 
 # aoss_client.delete_collection(id=collection_name['createCollectionDetail']['id'])
