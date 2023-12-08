@@ -48,8 +48,7 @@ for file_name in os.listdir(directory_path):
             print(f"JSONDecodeError: {e}")
             not_extracted_uid.append(file_name)
             continue
-# %% 
-all_extracted_info
 # %%
-not_extracted_uid
+with open('output.json', 'w') as json_file:
+    json.dump(all_extracted_info, json_file)
 # %%
